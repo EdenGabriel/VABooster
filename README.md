@@ -22,6 +22,8 @@ Please refer to [UMT](https://github.com/TencentARC/UMT) for more details.
 
 Please refer to [QD-DETR](https://github.com/wjun0830/QD-DETR) for more details.
 
+<!-- For `temporal shifts in audio', you can visit `shift_1d_feature' function from `start_end_dataset_audio.py', and use it in the `_get_audio_feat_by_vid' function in `start_end_dataset_audio.py'.-->
+
 ### 🔧Training and Evaluation
 - Train(Take `QVHighlights` as an example)
 ```python 
