@@ -43,4 +43,4 @@ If you are using our code, please consider citing the following paper.
 
 ```
 
-#### The implementation of this code is built upon [MomentDETR](https://github.com/jayleicn/moment_detr) and [QD-DETR](https://github.com/wjun0830/QD-DETR), and we would like to express gratitude for the open-source contribution of [MomentDETR](https://github.com/jayleicn/moment_detr), [QD-DETR](https://github.com/wjun0830/QD-DETR) , [UMT](https://github.com/TencentARC/UMT) and , [CG-DETR](https://github.com/wjun0830/CGDETR).
+#### The implementation of this code is built upon [MomentDETR](https://github.com/jayleicn/moment_detr) and [QD-DETR](https://github.com/wjun0830/QD-DETR), and we would like to express gratitude for the open-source contribution of [MomentDETR](https://github.com/jayleicn/moment_detr), [QD-DETR](https://github.com/wjun0830/QD-DETR) , [UMT](https://github.com/TencentARC/UMT), and [CG-DETR](https://github.com/wjun0830/CGDETR).
