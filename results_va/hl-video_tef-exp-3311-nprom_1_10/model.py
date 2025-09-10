@@ -59,8 +59,8 @@ def calculate_l1_norm(f):
     f = f / (f_norm + 1e-9)
     return f
 
-class CGDETR(nn.Module):
-    """ CG DETR. """
+class VABooster(nn.Module):
+    """ VABooster """
 
     def __init__(self, transformer, position_embed, txt_position_embed, txt_dim, vid_dim,
                  num_queries, input_dropout, aux_loss=False,
@@ -1003,7 +1003,7 @@ def build_model(args):
     position_embedding, txt_position_embedding = build_position_encoding(args)
 
     if args.a_feat_dir is None:
-        model = CGDETR(
+        model = VABooster(
             transformer,
             position_embedding,
             txt_position_embedding,
@@ -1020,7 +1020,7 @@ def build_model(args):
             args=args
         )
     else:
-        model = CGDETR(
+        model = VABooster(
             transformer,
             position_embedding,
             txt_position_embedding,

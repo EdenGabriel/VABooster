@@ -65,7 +65,7 @@ class VABoosterPredictor:
 
         # decode outputs
         outputs = self.model(**model_inputs)
-        # #moment_queries refers to the positional embeddings in CGDETR's decoder, not the input text query
+        # #moment_queries refers to the positional embeddings in VABooster's decoder, not the input text query
         prob = F.softmax(outputs["pred_logits"], -1)  # (batch_size, #moment_queries=10, #classes=2)
         scores = prob[..., 0]  # * (batch_size, #moment_queries)  foreground label is 0, we directly take it
         pred_spans = outputs["pred_spans"]  # (bsz, #moment_queries, 2)

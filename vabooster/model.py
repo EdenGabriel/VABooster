@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-CG-DETR model and criterion classes.
+VABooster model and criterion classes.
 """
 import math
 import torch
@@ -57,8 +57,8 @@ def calculate_l1_norm(f):
     f = f / (f_norm + 1e-9)
     return f
 
-class CGDETR(nn.Module):
-    """ CG DETR. """
+class VABooster(nn.Module):
+    """ VABooster. """
 
     def __init__(self, transformer, position_embed, txt_position_embed, txt_dim, vid_dim,
                  num_queries, input_dropout, aux_loss=False,
@@ -72,7 +72,7 @@ class CGDETR(nn.Module):
             txt_dim: int, text query input dimension
             vid_dim: int, video feature input dimension
             num_queries: number of object queries, ie detection slot. This is the maximal number of objects
-                         CG-DETR can detect in a single video.
+                         VABooster can detect in a single video.
             aux_loss: True if auxiliary decoding losses (loss at each decoder layer) are to be used.
             contrastive_align_loss: If true, perform span - tokens contrastive learning
             contrastive_hdim: dimension used for projecting the embeddings before computing contrastive loss
@@ -139,17 +139,6 @@ class CGDETR(nn.Module):
         self.global_rep_token = torch.nn.Parameter(torch.randn(args.total_prompts, hidden_dim))
         self.global_rep_pos = torch.nn.Parameter(torch.randn(1, hidden_dim))
 
-        # self.moment_rep_token = torch.nn.Parameter(torch.randn(hidden_dim))
-        # self.moment_rep_pos = torch.nn.Parameter(torch.randn(hidden_dim))
-
-        # normalize_before = False
-        # self.sent_rep_token = torch.nn.Parameter(torch.randn(hidden_dim))
-        # self.sent_rep_pos = torch.nn.Parameter(torch.randn(hidden_dim))
-
-        # scls_encoder_layer = TransformerEncoderLayer(hidden_dim, 8, self.args.dim_feedforward, 0.1, "prelu", normalize_before)
-        # scls_encoder_norm = nn.LayerNorm(hidden_dim) if normalize_before else None
-        # self.scls_encoder = TransformerEncoder(scls_encoder_layer, args.sent_layers, scls_encoder_norm)
-
         self.affine_bottleneck = nn.Sequential(*[
                 LinearLayer(hidden_dim, hidden_dim//2, layer_norm=False, dropout=0.0, relu=True),
                 LinearLayer(hidden_dim//2, hidden_dim, layer_norm=False, dropout=0.0, relu=False),
@@ -183,7 +172,6 @@ class CGDETR(nn.Module):
         return inp / (1e-6 + inp.norm(dim=dim, keepdim=True))
     
     def forward(self, src_txt, src_txt_mask, src_vid, src_vid_mask, vid, qid, src_aud=None, src_aud_mask=None, targets=None):
-    # def forward(self, targets=None):
         """The forward expects two tensors:
                - src_txt: [batch_size, L_txt, D_txt]
                - src_txt_mask: [batch_size, L_txt], containing 0 on padded pixels,
@@ -200,14 +188,6 @@ class CGDETR(nn.Module):
                - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
                                 dictionnaries containing the two above keys for each decoder layer.
         """
-        # src_txt=torch.randn(1, 30, 512).cuda()
-        # src_txt_mask=torch.randn(1, 30).cuda()
-        # src_vid=torch.randn(1, 75, 2818).cuda()
-        # src_vid_mask=torch.randn(1, 75).cuda()
-        # src_aud=torch.randn(1, 75, 2050).cuda()
-        # src_aud_mask=torch.randn(1, 75).cuda()
-        # vid=['_e8_yuedv6w_660.0_810.0',]
-        # qid=[8420,]
 
         ## For discovering real negative samples
         if vid is not None: ## for demo (run_on_video/run.py)
@@ -217,45 +197,6 @@ class CGDETR(nn.Module):
                 ori_vid = [v[:_position_to_cut[i]] for i, v in enumerate(vid)]
             else:
                 ori_vid = [v for v in vid]
-        # -_s0sXOfS3w_510.0_660.0 -_s0sXOfS3w_60.0_210.0 -_s0sXOfS3w_360.0_510.0 -_s0sXOfS3w_210.0_360.0
-        # targetvid = "-_s0sXOfS3w_510.0_660.0"
-        # if targetvid in vid:
-        #     index = vid.index(targetvid)
-        #     # print(index)torch.softmax(moment2txt_similarity, dim=-1)
-        #     vt_sim = torch.matmul(torch.mean(src_vid,dim=-1).unsqueeze(-1), torch.mean(torch.mean(src_txt,dim=-1),dim=-1).unsqueeze(-1).unsqueeze(-1))
-        #     at_sim = torch.matmul(torch.mean(src_aud,dim=-1).unsqueeze(-1), torch.mean(torch.mean(src_txt,dim=-1),dim=-1).unsqueeze(-1).unsqueeze(-1))
-        #     vt_sim,at_sim = torch.softmax(vt_sim.squeeze(-1), dim=-1),torch.softmax(at_sim.squeeze(-1), dim=-1)
-        #     print("vt_sim:",vt_sim[index])
-        #     print("at_sim:",at_sim[index])
-            
-        #     import matplotlib.pyplot as plt
-
-        #     # 创建一个图形对象
-        #     fig, ax = plt.subplots()
-        #     print(vt_sim[index].cpu().numpy().tolist())
-        #     # 绘制第一条曲线
-        #     ax.plot(vt_sim[index].cpu().numpy().tolist(), label='Vector 1')
-
-        #     # 绘制第二条曲线
-        #     ax.plot(at_sim[index].cpu().numpy().tolist(), label='Vector 2')
-
-        #     # 设置标签和标题
-        #     ax.set_xlabel('Index')
-        #     ax.set_ylabel('Value')
-        #     ax.set_title('Vectors Plot')
-
-        #     # 显示图例
-        #     ax.legend()
-        #     plt.savefig('test.png')
-        #     # 显示图形
-        #     plt.show()
-
-        # src_vid_mask: [bsz,vid_len]
-        # src_txt_mask: [bsz,max(in batch)_txt_len]
-        # src_aud.shape,src_aud_mask.shape: torch.Size([32, 75, 2050]) torch.Size([32, 75])
-        # if src_aud is not None:
-        #     src_vid = torch.cat([src_vid, src_aud], dim=2)
-            
 
         src_vid = self.input_vid_proj(src_vid)
         src_txt = self.input_txt_proj(src_txt)
@@ -263,115 +204,37 @@ class CGDETR(nn.Module):
         if src_aud is not None:
             src_aud = self.input_audio_proj(src_aud) 
             
-            # v2t_sim = torch.matmul(src_vid,src_txt.permute(0,2,1)).mean(-1).unsqueeze(-1)
-            # src_aud = src_aud * v2t_sim
-            # src_aud = F.normalize(src_aud,dim=-1)
-            # src_vid = src_vid + src_aud
+        # v2t_sim = torch.matmul(src_vid,src_txt.permute(0,2,1)).mean(-1).unsqueeze(-1)
+        # src_aud = src_aud * v2t_sim
+        # src_aud = F.normalize(src_aud,dim=-1)
+        # src_vid = src_vid + src_aud
 
         pos_vid = self.position_embed(src_vid, src_vid_mask)  # (bsz, L_vid, d)
         pos_txt = self.txt_position_embed(src_txt) if self.use_txt_pos else torch.zeros_like(src_txt)  # (bsz, L_txt, d)
         # pos_aud = self.position_embed(src_aud, src_aud_mask)  # (bsz, L_vid, d)
 
-        '''
-        # aud2txt_similarity = torch.matmul(src_aud, src_txt.permute(0, 2, 1))
-        vid2txt_similarity = torch.matmul(src_vid, src_txt.permute(0, 2, 1))
-        # aud2txt_ = F.softmax(aud2txt_similarity)
-        vid2txt_ = F.softmax(torch.mean(vid2txt_similarity,dim=-1),dim=-1)
-        # vid2txt_ = torch.sigmoid(torch.mean(vid2txt_similarity,dim=-1))
-        src_aud = src_aud*((1-vid2txt_).unsqueeze(-1))
-        src_vid = src_vid + src_aud
-        '''
-
-        # # # # # # # # # # # # # # # # # # # #
-        # all - no dropout - 45.31
-        # all - dropout - xxx
-        # aud_no_vid_maps + aud_vid_maps - no dropout - ???
-        # at_no_vid_audio_maps + aud_vid_maps - no dropout - xxx
-
-
         aud2txt_similarity = torch.matmul(src_aud, src_txt.permute(0, 2, 1))
         vid2txt_similarity = torch.matmul(src_vid, src_txt.permute(0, 2, 1))
-        # vid2aud_similarity = torch.matmul(src_vid, src_aud.permute(0, 2, 1))
+
         aud2txt_ = F.softmax(torch.mean(aud2txt_similarity,dim=-1),dim=-1)
         vid2txt_ = F.softmax(torch.mean(vid2txt_similarity,dim=-1),dim=-1)
-        # vid2aud_ = F.softmax(torch.mean(vid2aud_similarity,dim=-1),dim=-1)
 
         src_aud_no_vid_query = src_aud*((1-vid2txt_).unsqueeze(-1))  #V不关A关的音频 32 75 256
         src_vid_no_aud_query = src_vid*((1-aud2txt_).unsqueeze(-1))  #V关A不关的视频 32 75 256
         src_aud_vid_query = src_aud*src_vid  #V关A关的视频音频  32 75 256
-        # no_aud_no_vid_query = src_vid*((1-vid2txt_).unsqueeze(-1))*((1-aud2txt_).unsqueeze(-1)) #V不关A不关的视频
 
         aud_no_vid_maps = F.softmax(self.affine_bottleneck(src_aud_no_vid_query),dim=-1) #32 75 256
         vid_no_aud_maps = F.softmax(self.affine_bottleneck2(src_vid_no_aud_query),dim=-1) #32 75 256
-        # no_vid_no_aud_maps = F.softmax(self.affine_bottleneck3(no_aud_no_vid_query),dim=-1)
         aud_vid_maps = F.softmax(self.affine_bottleneck1(src_aud_vid_query),dim=-1) #32 75 256
-
-
-        # v_a = aud_vid_maps * src_vid 
-        # no_v_no_a = no_vid_no_aud_maps * src_vid  #v不关a不关
-
 
         src_vid_global = (src_vid * (vid_no_aud_maps + aud_vid_maps + 1))
         src_vid = (src_vid * (aud_no_vid_maps + aud_vid_maps + 1))
-
-        
-
-
-
-        # src_aud_no_vid_query  src_vid_no_aud_query
-        # global_tokens_norm = global_tokens / global_tokens.norm(dim=1)[:, None]
-        # global_tokens_sim = torch.matmul(global_tokens_norm, global_tokens_norm.permute(1, 0).detach())
-        # for i in range(len(global_tokens_sim)):
-        #     global_tokens_sim.fill_diagonal_(0)
-        # loss_global_ortho += global_tokens_sim.abs().mean()
-
-
-
-        # out["t2vattnvalues"] = (attn_weights * (src_txt_mask.unsqueeze(1).repeat(1, video_length, 1))).sum(2) # (batch_size, L_vid, L_txt) / (batch_size, L_txt)
-        # out["t2vattnvalues"] = torch.clamp(out["t2vattnvalues"], 0, 1)                                                                                                   ctxtoken=vidsrc_, gtoken=self.global_rep_token, gpos=self.global_rep_pos, vlen=src_vid_mask.sum(1).long())
-        # moment2txt_similarity = torch.matmul(mmemory_frames.permute(1, 0, 2), smemory_words.permute(1, 2, 0))
-        # nmoment2txt_similarity = torch.matmul(nmmemory_frames.permute(1, 0, 2), smemory_words.permute(1, 2, 0))
-
 
         # Input : Concat video, txt
         src = torch.cat([src_vid, src_txt], dim=1)  # (bsz, L_vid+L_txt, d)
         mask = torch.cat([src_vid_mask, src_txt_mask], dim=1).bool()  # (bsz, L_vid+L_txt)
         pos = torch.cat([pos_vid, pos_txt], dim=1)
         
-        ### sentence token
-        # smask_ = torch.tensor([[True]]).to(mask.device).repeat(src_txt_mask.shape[0], 1) #(bsz,1)
-        # smask = torch.cat([smask_, src_txt_mask.bool()], dim=1) #(bsz,1+L_txt)
-        # ssrc_ = self.sent_rep_token.reshape([1, 1, self.hidden_dim]).repeat(src_txt.shape[0], 1, 1)
-        # ssrc = torch.cat([ssrc_, src_txt], dim=1) #(bsz,1+L_txt,d)
-        # spos_ = self.sent_rep_pos.reshape([1, 1, self.hidden_dim]).repeat(pos_txt.shape[0], 1, 1)
-        # spos = torch.cat([spos_, pos_txt], dim=1)
-
-        # if targets is not None: # train
-        #     mmask_ = torch.tensor([[True]]).to(mask.device).repeat(src_vid_mask.shape[0], 1) # moment_token_mask
-        #     mmask = torch.cat([mmask_, src_vid_mask.bool()], dim=1) # all token mask
-        #     moment_mask_ = torch.clamp(targets["relevant_clips"], 0, 1).bool() # gt mask
-        #     moment_mask = torch.cat([mmask_, moment_mask_], dim=1)
-        #     mmask = mmask * moment_mask # --> moment_token_mask(bsz,1)+gt_token_mask
-
-        #     msrc_ = self.moment_rep_token.reshape([1, 1, self.hidden_dim]).repeat(src_vid.shape[0], 1, 1)
-        #     msrc = torch.cat([msrc_, src_vid], dim=1)
-        #     mpos_ = self.moment_rep_pos.reshape([1, 1, self.hidden_dim]).repeat(pos_vid.shape[0], 1, 1)
-        #     mpos = torch.cat([mpos_, pos_vid], dim=1)
-
-        #     ### for Not moment token ####
-        #     nmmask_ = torch.tensor([[True]]).to(mask.device).repeat(src_vid_mask.shape[0], 1)
-        #     nmmask = torch.cat([nmmask_, src_vid_mask.bool()], dim=1)
-        #     nmoment_mask_ = ~(torch.clamp(targets["relevant_clips"], 0, 1).bool())
-        #     nmoment_mask = torch.cat([nmmask_, nmoment_mask_], dim=1)
-        #     nmmask = nmmask * nmoment_mask
-
-        #     nmsrc_ = self.moment_rep_token.reshape([1, 1, self.hidden_dim]).repeat(src_vid.shape[0], 1, 1)
-        #     nmsrc = torch.cat([nmsrc_, src_vid], dim=1)
-        #     nmpos_ = self.moment_rep_pos.reshape([1, 1, self.hidden_dim]).repeat(pos_vid.shape[0], 1, 1)
-        #     nmpos = torch.cat([nmpos_, pos_vid], dim=1)
-        #     ###########
-        # else:
-        #     moment_mask_ = None
         moment_mask_ = None
 
         if self.args.global_cal_type == 'random_walk':
@@ -382,7 +245,6 @@ class CGDETR(nn.Module):
             for i in range(len(src_vid)):
                 vidsrc_[i] = src_vid_global[i][topkidx[i][-1]]
 
-
         elif self.args.global_cal_type == 'cross_attention':
             ## for t_2_vid-avg sal token
             vidsrc_ = torch.zeros((len(src_vid), 1, self.hidden_dim)).cuda()
@@ -392,17 +254,11 @@ class CGDETR(nn.Module):
         video_length = src_vid.shape[1]
 
         if targets is not None: ## train
-            # ssrc = ssrc.permute(1, 0, 2)  # (L, batch_size, d)
-            # spos = spos.permute(1, 0, 2)  # (L, batch_size, d)
-            # smemory = self.scls_encoder(ssrc, src_key_padding_mask=~smask, pos=spos)  # (L, batch_size, d)
-            # sentence_txt, smemory_words = smemory[0], smemory[1:] # sentence_txt : (batch_size, d)
             sentence_txt, smemory_words,moment2txt_similarity, nmoment2txt_similarity = None, None, None, None
             msrc, mpos, mmask, nmsrc, nmpos, nmmask = None, None, None, None, None, None
             hs, reference, memory, memory_global, attn_weights, memory_moment, nmmemory_moment, mmemory_frames, nmmemory_frames = self.transformer(src, ~mask, self.query_embed.weight, pos, video_length=video_length, moment_idx=targets["relevant_clips"],
                                                                                                                   ctxtoken=vidsrc_, gtoken=self.global_rep_token, gpos=self.global_rep_pos, vlen=src_vid_mask.sum(1).long())
             
-            # moment2txt_similarity = torch.matmul(mmemory_frames.permute(1, 0, 2), smemory_words.permute(1, 2, 0))
-            # nmoment2txt_similarity = torch.matmul(nmmemory_frames.permute(1, 0, 2), smemory_words.permute(1, 2, 0))
         else: ## inference
             sentence_txt, smemory_words, moment2txt_similarity, nmoment2txt_similarity = None, None, None, None
             hs, reference, memory, memory_global, attn_weights, memory_moment, nmmemory_moment, mmemory_frames, nmmemory_frames = self.transformer(src, ~mask, self.query_embed.weight, pos, video_length=video_length,
@@ -415,10 +271,6 @@ class CGDETR(nn.Module):
         if self.span_loss_type == "l1":
             outputs_coord = outputs_coord.sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_spans': outputs_coord[-1]}
-
-
-        # out["v_a"] = v_a
-        # out["no_v_no_a"] = no_v_no_a
 
         txt_mem = memory[:, src_vid.shape[1]:]  # (bsz, L_txt, d)
         vid_mem = memory[:, :src_vid.shape[1]]  # (bsz, L_vid, d)
@@ -484,8 +336,6 @@ class CGDETR(nn.Module):
         out["moment_mask"] = moment_mask_
         out["txt_mask"] = src_txt_mask
 
-        # out["t2vattnvalues"] = (attn_weights * (src_txt_mask.unsqueeze(1).repeat(1, video_length, 1))).sum(2) # (batch_size, L_vid, L_txt) / (batch_size, L_txt)
-        # out["t2vattnvalues"] = torch.clamp(out["t2vattnvalues"], 0, 1)
         out["global_rep_tokens"] = self.global_rep_token
 
         # if targets is not None:
@@ -1001,7 +851,7 @@ def build_model(args):
     position_embedding, txt_position_embedding = build_position_encoding(args)
 
     if args.a_feat_dir is None:
-        model = CGDETR(
+        model = VABooster(
             transformer,
             position_embedding,
             txt_position_embedding,
@@ -1018,7 +868,7 @@ def build_model(args):
             args=args
         )
     else:
-        model = CGDETR(
+        model = VABooster(
             transformer,
             position_embedding,
             txt_position_embedding,

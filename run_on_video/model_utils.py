@@ -1,5 +1,5 @@
 import torch
-from vabooster.model import build_transformer, build_position_encoding, CGDETR
+from vabooster.model import build_transformer, build_position_encoding, VABooster
 
 
 def build_inference_model(ckpt_path, **kwargs):
@@ -10,7 +10,7 @@ def build_inference_model(ckpt_path, **kwargs):
     transformer = build_transformer(args)
     position_embedding, txt_position_embedding = build_position_encoding(args)
 
-    model = CGDETR(
+    model = VABooster(
         transformer,
         position_embedding,
         txt_position_embedding,
